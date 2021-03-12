@@ -1,0 +1,41 @@
+name: Tag new version and build docker image
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  tag:
+    name: Tag new version
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    - name: Bump version and push tag
+      id: tag
+      uses: anothrNick/github-tag-action@master
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        DEFAULT_BUMP: patch
+        WITH_V: false
+
+  build-docker:
+    name: Build and publish docker image
+    needs: tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - name: Get latest tag
+        id: latest-tag
+        uses: WyriHaximus/github-action-get-previous-tag@0.1.0
+        env:
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+      - name: Buid and publish docker image
+        env:
+          IMAGE_TAG: ${{ steps.latest-tag.outputs.tag }}
+        run: |
+          docker login docker.pkg.github.com --username $GITHUB_ACTOR --password ${{ secrets.GITHUB_TOKEN }}
+          docker build --tag docker.pkg.github.com/$GITHUB_REPOSITORY/docs-image:$IMAGE_TAG /home/runner/work/docs-image/docs-image
+          docker push docker.pkg.github.com/$GITHUB_REPOSITORY/docs-image:$IMAGE_TAG
+          docker build --tag docker.pkg.github.com/$GITHUB_REPOSITORY/docs-image:latest /home/runner/work/docs-image/docs-image
+          docker push docker.pkg.github.com/$GITHUB_REPOSITORY/docs-image:latest
